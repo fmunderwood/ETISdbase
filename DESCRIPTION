@@ -1,0 +1,14 @@
+Package: ETISdbase
+Type: Package
+Title: Provides functions to create outputs from ETIS database
+Version: 0.1.0
+Authors: Bob Burn and Fiona Underwood
+Maintainer: Fiona Underwood <fiona@fmunderwood.com>
+Description: Functions for creating outputs from ETIS database. 
+   These outputs either go directly into the database.
+    Or they are stored as files which can be accessed by the database.
+Imports: tidyverse, RPostgreSQL, XLConnect
+License: GNU General Public License, Version 3
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 6.1.1
