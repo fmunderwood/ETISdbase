@@ -31,6 +31,8 @@
 #' discovery, transit and destination for seizures with multiple countries of origin
 #' @param df.inout  List created using inout_tables_LE_TF_prep with  list
 #' of seizures and weights in and out uncorrected for multiple countries of origin
+#'@param double.recs  List created using double_count of seizures in which countries of raw
+#' and worked origin are not (all) the same
 #'
 #' @return This writes files to three different places. Each gives
 #' seizures and weights in and out for each country and year specified:
@@ -51,6 +53,7 @@
 #' @seealso \code{\link{df_quantities_RIE_separate}},
 #' \code{\link{mult_ctries}},
 #' \code{\link{inout_tables_prep}}
+#' \code{\link{double_count}}
 #'
 #' @examples
 #' year.from <- 1900
@@ -61,7 +64,9 @@
 #' df.1 <- df_quantities_RIE_separate(year.from = year.from, year.to = year.to,
 #' statusMin = statusMin, reg.model = 'wt est.Rdata')
 #'
-#' mult.dat <- mult_ctries(year.from = 1900, year.to = 2100, statusMin = 3, df.1 = df.1)
+#' mult.dat <- mult_ctries(year.from = year.from, year.to = year.to, statusMin = statusMin, df.1 = df.1)
+#'
+#' double.recs <- double_count(year.from = year.from, year.to = year.to, statusMin = statusMin, df.RIE = df.1)
 #'
 #' ctry_dest_included <- FALSE
 #'
@@ -71,7 +76,7 @@
 #' inout_tables_final(year.from = year.from, year.to = year.to,
 #' statusMin = statusMin, ctry_dest_included = ctry_dest_included,
 #' size.min = size.min, which.out = which.out, mult.data = mult.dat,
-#' inout.data = df.inout)
+#' inout.data = df.inout, double.recs = double.recs )
 #_______________________________________________________________________
 inout_tables_final <-
   function(year.from = 1900,
@@ -81,7 +86,8 @@ inout_tables_final <-
            size.min = 0,
            which.out = 1:3,
            mult.data,
-           inout.data
+           inout.data,
+           double.recs
            )
 {
 year.from.all <- year.from
@@ -261,10 +267,12 @@ mutual_raw_use <- mutual_raw_reduce %>%
                                 reduce * (100 - proportion) * RIE.raw  / 100),
           sz.reduce = ifelse(complete_red, 1, 0)
       )
-
+# Extra column added here seizure_raw for use in double counting
 mutual_raw_sum <- mutual_raw_use %>%
-  select(seizure_id, seizure_year, raw_orig_code, amount.reduce, sz.reduce) %>%
+  mutate(seizure_raw = paste(seizure_id, ct_orig_raw_id, sep = ':')) %>%
+  select(seizure_id, seizure_year, raw_orig_code, ct_orig_raw_id, amount.reduce, sz.reduce, seizure_raw) %>%
   distinct()
+
 
 mutual_raw_sum_chk <- mutual_raw_use %>%
   group_by(seizure_id, seizure_year, raw_orig_code) %>%
@@ -328,23 +336,24 @@ wkd_product <- mutual_wkd_reduce %>%
   filter(red == 1) %>%
   mutate(orig_id = paste(wkd_orig_code, seizure_id, sep=":"))
 
-    mutual_wkd_use <- mutual_wkd_reduce %>%
-      filter(is.element(orig_id, wkd_product$orig_id)) %>%
-      mutate(amount.reduce = ifelse(complete_red,
-                                    RIE.wkd,
-                                    reduce * (100 - proportion) * RIE.wkd  / 100),
-             sz.reduce = ifelse(complete_red, 1, 0)
-      )
-
+mutual_wkd_use <- mutual_wkd_reduce %>%
+  filter(is.element(orig_id, wkd_product$orig_id)) %>%
+  mutate(amount.reduce = ifelse(complete_red,
+                                RIE.wkd,
+                                reduce * (100 - proportion) * RIE.wkd  / 100),
+         sz.reduce = ifelse(complete_red, 1, 0)
+  )
+# Extra column added here seizure_wkd for use in double counting
 mutual_wkd_sum <- mutual_wkd_use %>%
-  select(seizure_id, seizure_year, wkd_orig_code, amount.reduce, sz.reduce) %>%
+  mutate(seizure_wkd = paste(seizure_id, ct_orig_wkd_id, sep = ':')) %>%
+  select(seizure_id, seizure_year, wkd_orig_code, ct_orig_wkd_id, amount.reduce, sz.reduce, seizure_wkd) %>%
   distinct()
+
 
 mutual_wkd_sum_chk <- mutual_wkd_use %>%
   group_by(seizure_id, seizure_year, wkd_orig_code) %>%
   summarise(am.reduce = first(amount.reduce),
             sz.reduce = first(sz.reduce))
-
 
 
 # Combine raw and worked summaries
@@ -353,42 +362,81 @@ mutual_wkd_sum_chk <- mutual_wkd_use %>%
 # Summarise amount to reduce for  each year and country
 # And create a common key
 # RAW
-raw_summ <- mutual_raw_sum %>%
+
+#### NEW CODE ADDED HERE for double counting
+mutual_raw_sum_wkd <- mutual_raw_sum %>%
+  left_join(double.recs$double.raw, by =  "seizure_raw") %>%
+  mutate(wkd = replace_na(wkd, 0))
+
+# Adapt this as is the case for the worked below
+raw_summ <- mutual_raw_sum_wkd %>%
   group_by(raw_orig_code, seizure_year) %>%
   summarise(raw_reduce = sum(amount.reduce, na.rm = T),
             raw_sz_reduce = sum(sz.reduce, na.rm = T)) %>%
   mutate(year.ctry = paste(raw_orig_code, seizure_year, sep = ':'))
 
+
+raw_summ_wkd <- mutual_raw_sum_wkd %>%
+  group_by(raw_orig_code, seizure_year) %>%
+  summarise(wkd_double = sum(wkd, na.rm = T)) %>%
+  mutate(year.ctry = paste(raw_orig_code, seizure_year, sep = ':'))
+
+
 # WORKED
-wkd_summ <- mutual_wkd_sum %>%
+#### NEW CODE ADDED HERE for double counting
+mutual_wkd_sum_raw <- mutual_wkd_sum %>%
+  left_join(double.recs$double.wkd, by =  "seizure_wkd") %>%
+  mutate(raw = replace_na(raw, 0))
+
+wkd_summ <- mutual_wkd_sum_raw %>%
   group_by(wkd_orig_code, seizure_year) %>%
   summarise(wkd_reduce = sum(amount.reduce, na.rm = T),
             wkd_sz_reduce = sum(sz.reduce, na.rm= T)) %>%
   mutate(year.ctry = paste(wkd_orig_code, seizure_year, sep = ':'))
 
 
-# Join with raw
+wkd_summ_raw <- mutual_wkd_sum_raw %>%
+  group_by(wkd_orig_code, seizure_year) %>%
+  summarise(raw_double = sum(raw, na.rm = T)) %>%
+  mutate(year.ctry = paste(wkd_orig_code, seizure_year, sep = ':'))
+
+
+# Combine df.inout_tidy with parts to reduce
+# Join with RAW
 df.inout_raw <- df.inout_tidy %>%
   left_join(raw_summ, by = "year.ctry" ) %>%
   mutate(raw_reduce = replace_na(raw_reduce, 0),
          raw_sz_reduce = replace_na(raw_sz_reduce, 0))
 
-# Join with worked
+# Join with WORKED
 df.inout_raw_wkd <- df.inout_raw %>%
   left_join(wkd_summ, by = "year.ctry" ) %>%
   mutate(wkd_reduce = replace_na(wkd_reduce, 0),
          wkd_sz_reduce = replace_na(wkd_sz_reduce, 0))
 
+## NEW CODE ADDED HERE
+# Join with double count worked (from raw side)
+df.inout_raw_wkd <- df.inout_raw_wkd %>%
+  left_join(raw_summ_wkd, by = "year.ctry") %>%
+  mutate(wkd_double = replace_na(wkd_double, 0))
+
+# Join with double count raw (from worked side)
+df.inout_raw_wkd <- df.inout_raw_wkd %>%
+  left_join(wkd_summ_raw, by = "year.ctry") %>%
+  mutate(raw_double = replace_na(raw_double, 0))
+
+
 # Calculate overall reduction
 
 df.inout_reduce <- df.inout_raw_wkd %>%
-  mutate(total_reduce = raw_reduce + wkd_reduce,
+  mutate(total_reduce = raw_reduce + wkd_reduce  + raw_double + wkd_double,
          total_sz_reduce = raw_sz_reduce + wkd_sz_reduce)
 
-  df.inout_reduce <- df.inout_reduce %>%
-    mutate(wt.out.adj = wt.out - total_reduce,
-           sz.out.adj = sz.out - total_sz_reduce) %>%
-    select(id:wt.out, raw_reduce, wkd_reduce:sz.out.adj)
+df.inout_reduce <- df.inout_reduce %>%
+  mutate(wt.out.adj = wt.out - total_reduce,
+         sz.out.adj = sz.out - total_sz_reduce) %>%
+  select(id:wt.out, raw_reduce, wkd_reduce:sz.out.adj)
+
 
 # Create a file to use for checking
 # Basically everything that is available
@@ -442,15 +490,16 @@ wt.flow.tb <- df.inout_use %>%
     end.name <-  paste(end.name, '_min_', size.min, sep = '')
 
 # Write checking file to csv file
-#check.name <- paste(begin.name,  end.name,'CHK' , '.csv')
-#write.csv(df.chk, file = check.name)
-
+check.name <- paste(begin.name,  end.name,'CHK' , '.csv')
+write.csv(df.chk, file = check.name)
 # OUTPUT OPTIONS
+
 # (1) save df as csv file
 if(is.element(1,which.out)){
   csv.name <- paste(begin.name, end.name, '.csv', sep = '')
   write.csv(df.inout_use, file = csv.name, row.names = F)
 }
+
 # (2) save df as database table
 # Note may need to include public component
 #tablename <- paste('public.', begin.name, end.name, sep = '')

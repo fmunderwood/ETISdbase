@@ -6,7 +6,7 @@
 \usage{
 inout_tables_final(year.from = 1900, year.to = 2100, statusMin = 3,
   ctry_dest_included, size.min = 0, which.out = 1:3, mult.data,
-  inout.data)
+  inout.data, double.recs)
 }
 \arguments{
 \item{year.from}{Starting year}
@@ -24,6 +24,9 @@ used in cluster analysis when a size cutoff is used}
 
 \item{which.out}{which outputs to include. Denotes which of the outputs to be
 produced. If it includes 2 then year.from = 1900, year.to = 2100 and size.min = 0.}
+
+\item{double.recs}{List created using double_count of seizures in which countries of raw
+and worked origin are not (all) the same}
 
 \item{mult}{List created using mult_ctries() with countries of
 discovery, transit and destination for seizures with multiple countries of origin}
@@ -77,7 +80,9 @@ which.out <- 1:3
 df.1 <- df_quantities_RIE_separate(year.from = year.from, year.to = year.to,
 statusMin = statusMin, reg.model = 'wt est.Rdata')
 
-mult.dat <- mult_ctries(year.from = 1900, year.to = 2100, statusMin = 3, df.1 = df.1)
+mult.dat <- mult_ctries(year.from = year.from, year.to = year.to, statusMin = statusMin, df.1 = df.1)
+
+double.recs <- double_count(year.from = year.from, year.to = year.to, statusMin = statusMin, df.RIE = df.1)
 
 ctry_dest_included <- FALSE
 
@@ -87,10 +92,11 @@ statusMin = statusMin,ctry_dest_included = ctry_dest_included, df.1 = df.1)
 inout_tables_final(year.from = year.from, year.to = year.to,
 statusMin = statusMin, ctry_dest_included = ctry_dest_included,
 size.min = size.min, which.out = which.out, mult.data = mult.dat,
-inout.data = df.inout)
+inout.data = df.inout, double.recs = double.recs )
 }
 \seealso{
 \code{\link{df_quantities_RIE_separate}},
 \code{\link{mult_ctries}},
 \code{\link{inout_tables_prep}}
+\code{\link{double_count}}
 }
