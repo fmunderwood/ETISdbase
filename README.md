@@ -1,7 +1,6 @@
 # ETISdbaseRCode
-An R package containing functions to create outputs from the [ETIS database](https://www.etis-testing.org).
+An R package containing functions to create outputs from the Elephant Trade Information System [(ETIS) database](https://www.etis-testing.org).
 This package is used in conjunction with the code in the GitHub repository [fmunderwood/ETISdbaseRCode](https://github.com/fmunderwood/ETISdbaseRCode).
-
 
 The functions calculate seizures and weights in and out when dealing with multiple countries of origin.
 
