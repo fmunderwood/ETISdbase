@@ -1,4 +1,4 @@
-# ETISdbaseRCode
+# ETISdbase
 An R package containing functions to create outputs from the Elephant Trade Information System [(ETIS) database](https://www.etis-testing.org).
 This package is used in conjunction with the code in the GitHub repository [fmunderwood/ETISdbaseRCode](https://github.com/fmunderwood/ETISdbaseRCode).
 
